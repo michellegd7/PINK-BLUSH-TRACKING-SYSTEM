@@ -1,0 +1,500 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body.index {
+  background-color: #000000;
+  color: #333;
+}
+
+header {
+  background-color: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  padding: 20px 40px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.navbar {
+  top: 0;
+  display: flex;
+  position: sticky;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1000;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+  color: #ff00cc;
+}
+
+.nav-links {
+  list-style: none;
+  display: flex;
+  gap: 20px;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: #333;
+  font-weight: 500;
+}
+
+.nav-links a.active {
+  color: #ff00cc;
+  font-weight: bold;
+  border-bottom: 2px solid #ff00cc;
+}
+
+.visit {
+  background-color: #ff00cc;
+  color: #fff;
+  padding: 10px 20px;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 60px 40px;
+  background-color: #3a5d69;
+}
+
+.hero-text {
+  flex: 1;
+  background-image: url('pictures/pic2.jpg'); 
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+  padding: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  min-height: 550px; 
+}
+
+.hero-text::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(255, 146, 233, 0.5);
+  z-index: -1;
+}
+
+.hero-text h1 {
+  font-size: 40px;
+  margin-bottom: 20px;
+}
+
+.hero-text p {
+  font-size: 20px;
+  line-height: 1.6;
+  margin-bottom: 30px;
+}
+
+.services {
+  background-color: #ff00cc;
+  color: #ffffff;
+  padding: 10px 20px;
+  text-decoration: none;
+  font-weight: bold;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.hero-image {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.hero-image img {
+  width: 100%;
+  height: auto;
+}
+
+
+.features {
+  display: flex;
+  justify-content: space-around;
+  padding: 140px 40px;
+  gap: 60px;
+  background-color: #e4dbdb;
+} 
+
+.feature {
+  text-align: center;
+  max-width: 350px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: 20px;
+}
+
+
+.feature img {
+  width: 100%;
+  height: 450px; 
+  object-fit: cover;
+  border-radius: 16px;
+  margin-bottom: 15px;
+} 
+
+.feature h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .features {
+    padding: 20px 10px;
+    gap: 30px;
+  }
+
+  .feature h3 {
+    font-size: 16px;
+  }
+
+  .feature img {
+    max-height: 300px; 
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .nav-links {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .hero {
+    flex-direction: column;
+    padding: 40px 20px;
+  }
+
+  .features {
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    padding: 20px;
+  }
+
+  .feature {
+    max-width: 100%;
+  }
+
+  .auth-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-box {
+    padding: 20px;
+    margin-top: 30px;
+  }
+
+  .input-group {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .input-group i {
+    margin-bottom: 8px;
+  }
+
+  .input-group input {
+    font-size: 14px;
+  }
+
+
+  button {
+    font-size: 14px;
+    padding: 10px;
+  }
+
+  h2 {
+    font-size: 20px;
+    margin-bottom: 20px;
+  }
+
+  .back-button {
+    top: 10px;
+    left: 10px;
+  }
+
+  .back-button a {
+    font-size:14px;
+    padding: 6px 10px;
+  }
+
+  .form-layer {
+    grid-template-columns: 1fr;
+  }
+}
+
+.auth-buttons {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.auth-link {
+  text-decoration: none;
+  color: #ff00cc;
+  font-weight: 500;
+  padding: 8px 12px;
+  border: 1px solid #ff00cc;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.auth-link:hover {
+  background-color: #ff00cc;
+  color: #fff;
+}
+
+.contact-section {
+  position: relative;
+  padding: 210px 20px;
+  text-align: center;
+  border-top: 2px solid #f3b6c4;
+  overflow: hidden;
+}
+
+.contact-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: url('pictures/pb.jpg') no-repeat center center;
+  background-size: cover;
+  filter: blur(5px);
+  z-index: 0;
+  opacity: 0.6;
+}
+
+.contact-container {
+  position: relative; 
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: #fff0f5;
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 8px 16px rgba(220, 150, 170, 0.2);
+}
+
+.contact-section h2 {
+  font-size: 2.5em;
+  color: #d81b60;
+  margin-bottom: 10px;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.tagline {
+  font-size: 1.2em;
+  color: #555;
+  margin-bottom: 30px;
+}
+
+.contact-details p {
+  font-size: 1.1em;
+  margin: 10px 0;
+  color: #444;
+}
+
+
+------------------uniform-offered--------------------------
+body {
+  font-family: Arial, sans-serif;
+  margin: 0; 
+  padding: 0;
+  background-color: #f4f4f4;
+}
+
+.navbar1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 40px;
+  background: white;
+}
+
+.navbar .logo {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ff00cc;
+}
+
+.navbar ul {
+  list-style: none;
+  display: flex;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar ul li {
+  margin-left: 20px;
+}
+
+.navbar ul li a {
+  text-decoration: none;
+  color: #ff00cc; 
+  font-weight: bold;
+}
+
+.search-section {
+  background: url('pictures/schoolwear.jpg') no-repeat center center/cover;
+  height: 350px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.school-uniform {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  justify-items: center;
+  margin-top: 20px;
+}
+
+.menu-section {
+  padding: 30px;
+  text-align: center;
+}
+
+.menu-section h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.food-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.food-item {
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  text-align: left;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+}
+
+.food-item img {
+  width: 100px;
+  height: 100px;
+  border-radius: 10px;
+  margin-right: 15px;
+}
+
+.food-info h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.food-info p {
+  font-size: 14px;
+  color: #555;
+  margin: 5px 0;
+}
+
+.price {
+  font-weight: bold;
+  margin: 5px 0;
+}
+
+.order-btn {
+  display: inline-block;
+  padding: 6px 12px;
+  background: green;
+  color: white;
+  border-radius: 5px;
+  text-decoration: none;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+
+.school-uni img {
+  width: 200px;       
+  height: auto;       
+  object-fit: contain; 
+  border-radius: 10px; 
+  display: block;
+  margin: 0 auto;  
+}
+
+.school-uniform {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px; 
+  justify-items: center; 
+  margin-top: 20px;
+}
+
+.school-uni, 
+.food-item {
+  background: white;
+  border-radius: 10px;
+  padding: 25px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  width: 300px; 
+}
+
+
+.school-uni form button {
+  margin-top: 10px;
+  padding: 10px 20px;
+  background-color: #e63946;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+
+.school-uni form button:hover {
+  background-color: #d62828;
+}
