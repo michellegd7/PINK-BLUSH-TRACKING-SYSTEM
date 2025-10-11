@@ -191,7 +191,7 @@
                     if (response === 'success') {
                         window.location.href = role === 'admin' ? 'admin_dashboard.php' : 'staff_dashboard.php';
                     } else {
-                        alert('Invalid credentials. Please try again.');
+                        alert('Invalid Password. Please try again.');
                     }
                 })
                 .catch(error => {
