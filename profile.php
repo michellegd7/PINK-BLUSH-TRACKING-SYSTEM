@@ -39,8 +39,7 @@ $orderQuery = "SELECT
     oi.measurement,
     oi.quantity,
     oi.price as item_price,
-    oi.status as item_status,
-    (oi.price * oi.quantity) as item_subtotal
+    oi.status as item_status
 FROM orders o 
 LEFT JOIN payment p ON o.order_id = p.order_id 
 LEFT JOIN order_item oi ON o.order_id = oi.order_id
@@ -52,7 +51,7 @@ mysqli_stmt_bind_param($orderStmt, "i", $customer_id);
 mysqli_stmt_execute($orderStmt);
 $orderResult = mysqli_stmt_get_result($orderStmt);
 
-// Group orders with their items
+// Group orders with their items and calculate totals
 $ordersData = [];
 while ($row = mysqli_fetch_assoc($orderResult)) {
   $order_id = $row['order_id'];
@@ -65,24 +64,38 @@ while ($row = mysqli_fetch_assoc($orderResult)) {
       'order_status' => $row['order_status'],
       'payment_method' => $row['payment_method'],
       'payment_status' => $row['payment_status'],
-      'downpayment' => $row['downpayment'],
-      'total_amount' => $row['total_amount'],
+      'downpayment' => floatval($row['downpayment'] ?? 0),
+      'total_amount' => floatval($row['total_amount'] ?? 0),
       'payment_date' => $row['payment_date'],
-      'items' => []
+      'items' => [],
+      'calculated_total' => 0
     ];
   }
 
   if ($row['order_item_id']) {
+    $item_subtotal = floatval($row['item_price']) * intval($row['quantity']);
+    $ordersData[$order_id]['calculated_total'] += $item_subtotal;
+
     $ordersData[$order_id]['items'][] = [
       'order_item_id' => $row['order_item_id'],
       'item_type' => $row['item_type'],
       'measurement' => $row['measurement'],
       'quantity' => $row['quantity'],
-      'item_price' => $row['item_price'],
+      'item_price' => floatval($row['item_price']),
       'item_status' => $row['item_status'],
-      'item_subtotal' => $row['item_subtotal']
+      'item_subtotal' => $item_subtotal
     ];
   }
+}
+
+// Use payment table total if available, otherwise use calculated total
+foreach ($ordersData as $order_id => &$order) {
+  if ($order['total_amount'] == 0 && $order['calculated_total'] > 0) {
+    $order['total_amount'] = $order['calculated_total'];
+  }
+
+  // Calculate balance
+  $order['balance'] = max(0, $order['total_amount'] - $order['downpayment']);
 }
 
 // Separate active and completed orders
@@ -91,7 +104,7 @@ $completedOrders = [];
 
 foreach ($ordersData as $order) {
   $status = strtolower($order['order_status']);
-  if (in_array($status, ['completed', 'delivered'])) {
+  if (in_array($status, ['completed', 'pickup'])) {
     $completedOrders[] = $order;
   } else {
     $activeOrders[] = $order;
@@ -111,7 +124,7 @@ $trackingStages = [
   'final_pressing' => 'Final Pressing / Packaging',
   'ready_for_pickup' => 'Ready for Pickup',
   'final_payment' => 'Final Payment',
-  'delivered' => 'Delivered to Customer'
+  'pick_up' => 'Pickup by the Customer'
 ];
 
 // Function to get current stage index
@@ -120,22 +133,30 @@ function getCurrentStageIndex($status)
   $statusMap = [
     'pending' => 0,
     'order_confirmation' => 0,
+    'order confirmation' => 0,
     'payment_confirmation' => 1,
+    'payment confirmation' => 1,
     'measurement' => 2,
     'material_prep' => 3,
+    'material preparation' => 3,
     'cutting' => 4,
     'sewing' => 5,
     'finishing' => 6,
     'quality_checking' => 7,
+    'quality checking' => 7,
     'final_pressing' => 8,
+    'final pressing / packaging' => 8,
     'ready_for_pickup' => 9,
+    'ready for pickup' => 9,
     'ready' => 9,
     'final_payment' => 10,
-    'delivered' => 11,
+    'final payment' => 10,
+    'pick_up' => 11,
+    'pickup by the customer' => 11,
     'completed' => 11
   ];
 
-  $status = strtolower(str_replace(' ', '_', $status));
+  $status = strtolower(str_replace(['  ', '_'], [' ', ' '], $status));
   return isset($statusMap[$status]) ? $statusMap[$status] : 0;
 }
 
@@ -590,7 +611,7 @@ function getCurrentStageIndex($status)
                   <div class="item-detail">
                     <div><strong><?= htmlspecialchars($item['item_type']) ?></strong></div>
                     <div>Size: <?= htmlspecialchars($item['measurement']) ?></div>
-                    <div>Qty: <?= htmlspecialchars($item['quantity']) ?></div>
+                    <div>Quantity: <?= htmlspecialchars($item['quantity']) ?></div>
                     <div>₱<?= number_format($item['item_subtotal'], 2) ?></div>
                   </div>
                 <?php endforeach; ?>
@@ -647,7 +668,7 @@ function getCurrentStageIndex($status)
                           echo 'Thorough inspection for defects and fit';
                           break;
                         case 'final_pressing':
-                          echo 'Ironing and preparing for delivery';
+                          echo 'Ironing and preparing for pick-up';
                           break;
                         case 'ready_for_pickup':
                           echo 'Order is ready for collection';
@@ -655,8 +676,8 @@ function getCurrentStageIndex($status)
                         case 'final_payment':
                           echo 'Complete remaining payment balance';
                           break;
-                        case 'delivered':
-                          echo 'Order successfully delivered';
+                        case 'pick_up':
+                          echo 'Order successfully collected';
                           break;
                       }
                       ?>
@@ -690,21 +711,18 @@ function getCurrentStageIndex($status)
 
               <div>
                 <strong>Total Amount</strong>
-                <span>₱<?= number_format($order['total_amount'] ?? 0, 2) ?></span>
+                <span>₱<?= number_format($order['total_amount'], 2) ?></span>
               </div>
 
-              <?php if (isset($order['downpayment']) && $order['downpayment'] > 0): ?>
+              <?php if ($order['downpayment'] > 0): ?>
                 <div>
                   <strong>Downpayment</strong>
                   <span style="color: #2e7d32;">₱<?= number_format($order['downpayment'], 2) ?></span>
                 </div>
-                <?php
-                $remainingBalance = max(0, ($order['total_amount'] ?? 0) - $order['downpayment']);
-                ?>
                 <div>
                   <strong>Balance</strong>
-                  <span style="color: <?= $remainingBalance > 0 ? '#c05621' : '#2e7d32' ?>;">
-                    ₱<?= number_format($remainingBalance, 2) ?>
+                  <span style="color: <?= $order['balance'] > 0 ? '#c05621' : '#2e7d32' ?>;">
+                    ₱<?= number_format($order['balance'], 2) ?>
                   </span>
                 </div>
               <?php endif; ?>
@@ -762,54 +780,27 @@ function getCurrentStageIndex($status)
               </div>
               <div class="payment-row">
                 <label>Total Amount:</label>
-                <span class="value">₱<?= number_format($order['total_amount'] ?? 0, 2) ?></span>
+                <span class="value">₱<?= number_format($order['total_amount'], 2) ?></span>
               </div>
               <?php if ($order['downpayment'] > 0): ?>
                 <div class="payment-row">
                   <label>Downpayment Paid:</label>
                   <span class="value" style="color: #2e7d32;">₱<?= number_format($order['downpayment'], 2) ?></span>
                 </div>
-                <?php
-                $balance = max(0, ($order['total_amount'] ?? 0) - $order['downpayment']);
-                ?>
                 <div class="payment-row">
                   <label>Balance Due:</label>
-                  <span class="value" style="color: <?= $balance > 0 ? '#c05621' : '#2e7d32' ?>; font-size: 18px;">
-                    ₱<?= number_format($balance, 2) ?>
+                  <span class="value" style="color: <?= $order['balance'] > 0 ? '#c05621' : '#2e7d32' ?>; font-size: 18px;">
+                    ₱<?= number_format($order['balance'], 2) ?>
                   </span>
                 </div>
               <?php endif; ?>
             </div>
-
-            <?php if (!empty($order['items'])): ?>
-              <div class="order-items-list" style="margin-top: 15px;">
-                <h5>Items:</h5>
-                <?php foreach ($order['items'] as $item): ?>
-                  <div class="item-detail">
-                    <div><strong><?= htmlspecialchars($item['item_type']) ?></strong></div>
-                    <div>Size: <?= htmlspecialchars($item['measurement']) ?></div>
-                    <div>Qty: <?= htmlspecialchars($item['quantity']) ?></div>
-                    <div style="text-align: right;">₱<?= number_format($item['item_subtotal'], 2) ?></div>
-                  </div>
-                <?php endforeach; ?>
-              </div>
-            <?php endif; ?>
-
-            <div class="payment-info-box">
-              <div class="payment-row">
-                <label>Payment Method:</label>
-                <span class="value"><?= htmlspecialchars(ucfirst($order['payment_method'] ?? 'Cash')) ?></span>
-              </div>
-              <div class="payment-row">
-                <label>Total Paid:</label>
-                <span class="value" style="color: #2e7d32; font-size: 18px;">₱<?= number_format($order['total_amount'] ?? 0, 2) ?></span>
-              </div>
-            </div>
           </div>
         <?php endforeach; ?>
+      <?php else: ?>
+        <div class="no-orders">No orders found</div>
+      <?php endif; ?>
     </div>
-  <?php endif; ?>
-
   </div>
 </body>
 
