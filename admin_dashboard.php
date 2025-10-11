@@ -13,41 +13,13 @@ $admin_initial = strtoupper(substr($admin_name, 0, 1));
 
 include 'database.php';
 
-// Get dashboard statistics
-$total_orders = 0;
-$in_progress_orders = 0;
-$completed_today = 0;
-$due_tomorrow = 0;
-
-// Total active orders (not completed or delivered)
-$result = $conn->query("SELECT COUNT(*) as total FROM orders WHERE status NOT IN ('Completed', 'Delivered', 'Cancelled')");
-if ($result) {
-    $total_orders = $result->fetch_assoc()['total'];
-}
-
-// In progress orders (Processing status)
-$result = $conn->query("SELECT COUNT(*) as progress FROM orders WHERE status = 'Processing'");
-if ($result) {
-    $in_progress_orders = $result->fetch_assoc()['progress'];
-}
-
-// Completed today
-$result = $conn->query("SELECT COUNT(*) as completed FROM orders WHERE status IN ('Completed', 'Delivered') AND DATE(order_date) = CURDATE()");
-if ($result) {
-    $completed_today = $result->fetch_assoc()['completed'];
-}
-
-// Due tomorrow
-$result = $conn->query("SELECT COUNT(*) as due FROM orders WHERE DATE(due_date) = DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND status NOT IN ('Completed', 'Delivered', 'Cancelled')");
-if ($result) {
-    $due_tomorrow = $result->fetch_assoc()['due'];
-}
-
-// Get recent orders with customer info - removed total_amount from query
+// ✅ FIXED: Get recent orders with customer info AND payment data
 $recent_orders = [];
-$query = "SELECT o.*, c.first_name, c.last_name, c.contact_number
+$query = "SELECT o.*, c.first_name, c.last_name, c.contact_number,
+          p.payment_status, p.payment_method, p.total_amount as payment_total
           FROM orders o 
           LEFT JOIN customer c ON o.customer_id = c.customer_id 
+          LEFT JOIN payment p ON o.order_id = p.order_id
           ORDER BY o.order_date DESC 
           LIMIT 6";
 $result = $conn->query($query);
@@ -59,7 +31,7 @@ if ($result) {
 foreach ($recent_orders as &$order) {
     $order_id = $order['order_id'];
 
-    // Get order items
+    // Get order items with measurement (size) information
     $items_query = "SELECT oi.*, u.uniform_name AS product_name
                 FROM order_item oi
                 LEFT JOIN uniform_options u ON oi.item_type = u.uniform_name
@@ -72,29 +44,21 @@ foreach ($recent_orders as &$order) {
     $order['items'] = $items_result->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
 
-    // Calculate total amount from order items
-    $total_amount = 0;
-    foreach ($order['items'] as $item) {
-        $total_amount += ($item['price'] ?? 0) * ($item['quantity'] ?? 0);
+    // ✅ FIXED: Use payment table's total_amount if available, otherwise calculate
+    if (!isset($order['payment_total']) || $order['payment_total'] == 0) {
+        $total_amount = 0;
+        foreach ($order['items'] as $item) {
+            $total_amount += ($item['price'] ?? 0) * ($item['quantity'] ?? 0);
+        }
+        $order['total_amount'] = $total_amount;
+    } else {
+        $order['total_amount'] = $order['payment_total'];
     }
-    $order['total_amount'] = $total_amount;
 
-    // Set default payment_status if not exists
+    // ✅ FIXED: Payment status now comes from payment table (via JOIN)
     if (!isset($order['payment_status']) || empty($order['payment_status'])) {
         $order['payment_status'] = 'Unpaid';
     }
-}
-
-// Get recent activity orders
-$recent_activity = [];
-$query = "SELECT o.*, c.first_name, c.last_name 
-          FROM orders o 
-          LEFT JOIN customer c ON o.customer_id = c.customer_id 
-          ORDER BY o.order_date DESC 
-          LIMIT 4";
-$result = $conn->query($query);
-if ($result) {
-    $recent_activity = $result->fetch_all(MYSQLI_ASSOC);
 }
 ?>
 
@@ -213,49 +177,11 @@ if ($result) {
             font-size: 1.1rem;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            text-align: center;
-            transition: transform 0.2s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-        }
-
-        .stat-icon {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2d3748;
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-label {
-            color: #718096;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
         .table-container {
             background: white;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
+            overflow-x: auto;
             margin-bottom: 2rem;
         }
 
@@ -305,6 +231,7 @@ if ($result) {
         table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 1000px;
         }
 
         th,
@@ -382,17 +309,7 @@ if ($result) {
         }
 
         .order-items {
-            max-width: 200px;
-        }
-
-        .item-badge {
-            display: inline-block;
-            background: #edf2f7;
-            padding: 0.2rem 0.6rem;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            margin: 0.15rem;
-            color: #4a5568;
+            max-width: 180px;
         }
 
         .items-summary {
@@ -448,7 +365,7 @@ if ($result) {
             }
 
             .order-items {
-                max-width: 100px;
+                max-width: 120px;
             }
         }
     </style>
@@ -467,7 +384,7 @@ if ($result) {
                 <li class="nav-item"><a href="admin_orders.php">Orders</a></li>
                 <li class="nav-item"><a href="admin_customer.php">Customers</a></li>
                 <li class="nav-item"><a href="admin_products.php">Products</a></li>
-                <li class="nav-item"><a href="admin_track_order.php">Tracking</a></li>
+                <li class="nav-item"><a href="admin_stocks.php">Stocks</a></li>
             </ul>
 
             <div class="user-info">
@@ -481,32 +398,6 @@ if ($result) {
         <div class="page-header">
             <h1 class="page-title">Pink Blush Tailoring Dashboard</h1>
             <p class="page-subtitle">Track custom orders and manage your tailoring workflow</p>
-        </div>
-
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon">📋</div>
-                <div class="stat-value"><?php echo $total_orders; ?></div>
-                <div class="stat-label">Active Orders</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-icon">✂️</div>
-                <div class="stat-value"><?php echo $in_progress_orders; ?></div>
-                <div class="stat-label">In Progress</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-icon">👗</div>
-                <div class="stat-value"><?php echo $completed_today; ?></div>
-                <div class="stat-label">Completed Today</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-icon">📅</div>
-                <div class="stat-value"><?php echo $due_tomorrow; ?></div>
-                <div class="stat-label">Due Tomorrow</div>
-            </div>
         </div>
 
         <div class="table-container">
@@ -524,6 +415,8 @@ if ($result) {
                         <th>Order ID</th>
                         <th>Customer</th>
                         <th>Order Items</th>
+                        <th>Quantity</th>
+                        <th>Size</th>
                         <th>Order Date</th>
                         <th>Status</th>
                         <th>Payment</th>
@@ -549,19 +442,37 @@ if ($result) {
 
                                 <td class="order-items">
                                     <?php if (!empty($order['items'])): ?>
-                                        <?php
-                                        $item_count = count($order['items']);
-                                        if ($item_count <= 2):
-                                            foreach ($order['items'] as $item): ?>
-                                                <span class="item-badge">
-                                                    <?php echo htmlspecialchars($item['product_name'] ?? 'Unknown'); ?> (<?php echo $item['quantity']; ?>)
-                                                </span>
-                                            <?php endforeach;
-                                        else: ?>
-                                            <span class="items-summary"><?php echo $item_count; ?> items</span>
-                                        <?php endif; ?>
+                                        <?php foreach ($order['items'] as $item): ?>
+                                            <span class="item-badge">
+                                                <?php echo htmlspecialchars($item['product_name'] ?? 'Unknown'); ?>
+                                            </span>
+                                        <?php endforeach; ?>
                                     <?php else: ?>
                                         <span class="items-summary">No items</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td>
+                                    <?php if (!empty($order['items'])): ?>
+                                        <?php foreach ($order['items'] as $item): ?>
+                                            <span style="font-weight: 500;"> <?php echo $item['quantity']; ?></span>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <span style="color: #a0aec0;">-</span>
+                                    <?php endif; ?>
+                                </td>
+
+                                <td>
+                                    <?php if (!empty($order['items'])): ?>
+                                        <?php foreach ($order['items'] as $item): ?>
+                                            <?php if (!empty($item['measurement'])): ?>
+                                                <span class="size-badge"><?php echo htmlspecialchars($item['measurement']); ?></span>
+                                            <?php else: ?>
+                                                <span style="color: #a0aec0; font-size: 0.75rem;">N/A</span>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <span style="color: #a0aec0; font-size: 0.75rem;">-</span>
                                     <?php endif; ?>
                                 </td>
 
@@ -601,7 +512,7 @@ if ($result) {
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="9" style="text-align: center; color: #718096; font-style: italic; padding: 2rem;">No orders found</td>
+                            <td colspan="11" style="text-align: center; color: #718096; font-style: italic; padding: 2rem;">No orders found</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
