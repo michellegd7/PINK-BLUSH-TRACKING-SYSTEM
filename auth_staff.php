@@ -1,71 +1,138 @@
 <?php
-include 'database.php';
 session_start();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
+// Database configuration
+$host = 'localhost';
+$dbname = 'pink_blush_tailoring';
+$username = 'root';
+$password = '';
 
-    // LOGIN
-    if ($action === 'login') {
-        $username = mysqli_real_escape_string($conn, $_POST['username']);
-        $password = $_POST['password'];
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Connection failed: " . $e->getMessage());
+}
 
-        // Query staff table
-        $query = "SELECT * FROM staff WHERE username = ?";
-        $stmt = mysqli_prepare($conn, $query);
-        mysqli_stmt_bind_param($stmt, "s", $username);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
+// Handle login
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'login') {
+    $role = $_POST['role'];
+    $inputUsername = trim($_POST['username']);
+    $inputPassword = trim($_POST['password']);
 
-        if ($row = mysqli_fetch_assoc($result)) {
-            // Verify password
-            if (password_verify($password, $row['password'])) {
-                $_SESSION['staff_logged_in'] = true;
-                $_SESSION['staff_id'] = $row['staff_id'];
-                $_SESSION['staff_username'] = $row['username'];
-                $_SESSION['staff_name'] = $row['full_name'];
-                echo 'success';
-            } else {
-                echo 'invalid';
-            }
-        } else {
-            echo 'invalid';
-        }
-        mysqli_stmt_close($stmt);
-    }
+    if ($role === 'admin') {
+        // Query admin table
+        $stmt = $pdo->prepare("SELECT * FROM admin WHERE username = :username LIMIT 1");
+        $stmt->execute(['username' => $inputUsername]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // REGISTER
-    if ($action === 'register') {
-        $full_name = mysqli_real_escape_string($conn, $_POST['full_name']);
-        $username = mysqli_real_escape_string($conn, $_POST['username']);
-        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+        if ($user && password_verify($inputPassword, $user['password'])) {
+            // Set session variables
+            $_SESSION['user_id'] = $user['admin_id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['full_name'] = $user['full_name'];
+            $_SESSION['role'] = 'admin';
+            $_SESSION['contact_number'] = $user['contact_number'];
 
-        // Check if username exists
-        $checkQuery = "SELECT username FROM staff WHERE username = ?";
-        $checkStmt = mysqli_prepare($conn, $checkQuery);
-        mysqli_stmt_bind_param($checkStmt, "s", $username);
-        mysqli_stmt_execute($checkStmt);
-        $checkResult = mysqli_stmt_get_result($checkStmt);
-
-        if (mysqli_num_rows($checkResult) > 0) {
-            echo 'username_exists';
-            mysqli_stmt_close($checkStmt);
-            exit();
-        }
-        mysqli_stmt_close($checkStmt);
-
-        // Insert new staff
-        $insertQuery = "INSERT INTO staff (full_name, username, password) VALUES (?, ?, ?)";
-        $insertStmt = mysqli_prepare($conn, $insertQuery);
-        mysqli_stmt_bind_param($insertStmt, "sss", $full_name, $username, $password);
-
-        if (mysqli_stmt_execute($insertStmt)) {
-            echo 'registered';
+            echo 'success';
         } else {
             echo 'error';
         }
-        mysqli_stmt_close($insertStmt);
+    } elseif ($role === 'staff') {
+        // Query staff table
+        $stmt = $pdo->prepare("SELECT * FROM staff WHERE username = :username AND status = 'Active' LIMIT 1");
+        $stmt->execute(['username' => $inputUsername]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user && password_verify($inputPassword, $user['password'])) {
+            // Set session variables
+            $_SESSION['user_id'] = $user['staff_id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['full_name'] = $user['full_name'];
+            $_SESSION['role'] = $user['role'];
+            $_SESSION['email'] = $user['email'];
+            $_SESSION['contact_number'] = $user['contact_number'];
+            $_SESSION['status'] = $user['status'];
+
+            echo 'success';
+        } else {
+            echo 'error';
+        }
+    } else {
+        echo 'error';
     }
+    exit;
 }
 
-mysqli_close($conn);
+// Handle registration
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register') {
+    $role = $_POST['role'];
+    $fullName = trim($_POST['full_name']);
+    $username = trim($_POST['username']);
+    $password = trim($_POST['password']);
+    $contactNumber = trim($_POST['contact_number']);
+
+    // Hash the password
+    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
+    try {
+        if ($role === 'admin') {
+            // Check if username already exists
+            $stmt = $pdo->prepare("SELECT admin_id FROM admin WHERE username = :username");
+            $stmt->execute(['username' => $username]);
+
+            if ($stmt->rowCount() > 0) {
+                echo 'username_exists';
+                exit;
+            }
+
+            // Insert new admin
+            $stmt = $pdo->prepare("INSERT INTO admin (full_name, username, password, contact_number) VALUES (:full_name, :username, :password, :contact_number)");
+            $stmt->execute([
+                'full_name' => $fullName,
+                'username' => $username,
+                'password' => $hashedPassword,
+                'contact_number' => $contactNumber
+            ]);
+
+            echo 'success';
+        } elseif ($role === 'staff') {
+            $email = trim($_POST['email']);
+            $staffRole = $_POST['staff_role'];
+
+            // Check if username already exists
+            $stmt = $pdo->prepare("SELECT staff_id FROM staff WHERE username = :username");
+            $stmt->execute(['username' => $username]);
+
+            if ($stmt->rowCount() > 0) {
+                echo 'username_exists';
+                exit;
+            }
+
+            // Insert new staff
+            $stmt = $pdo->prepare("INSERT INTO staff (full_name, username, password, role, email, contact_number, status, created_at) VALUES (:full_name, :username, :password, :role, :email, :contact_number, 'Active', NOW())");
+            $stmt->execute([
+                'full_name' => $fullName,
+                'username' => $username,
+                'password' => $hashedPassword,
+                'role' => $staffRole,
+                'email' => $email,
+                'contact_number' => $contactNumber
+            ]);
+
+            echo 'success';
+        } else {
+            echo 'error';
+        }
+    } catch (PDOException $e) {
+        echo 'error';
+    }
+    exit;
+}
+
+// Handle logout
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    session_destroy();
+    header('Location: admin_login.php');
+    exit;
+}
