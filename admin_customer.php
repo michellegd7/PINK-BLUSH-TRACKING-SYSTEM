@@ -442,12 +442,12 @@ if ($result) {
                 <li class="nav-item"><a href="admin_orders.php">Orders</a></li>
                 <li class="nav-item active"><a href="admin_customer.php">Customers</a></li>
                 <li class="nav-item"><a href="admin_products.php">Products</a></li>
-                <li class="nav-item"><a href="track_order.php">Tracking</a></li>
+                <li class="nav-item"><a href="admin_stocks.php">Stocks</a></li>
             </ul>
 
             <div class="user-info">
-                <span><?php echo htmlspecialchars($admin_name); ?></span>
-                <div class="avatar"><?php echo $admin_initial; ?></div>
+                <span>Maria Santos</span>
+                <div class="avatar">MS</div>
             </div>
         </div>
     </nav>
