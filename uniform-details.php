@@ -17,21 +17,8 @@ mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
 
 $uniforms = [];
-$sizes = [];
-$prices = [];
-
 while ($row = mysqli_fetch_assoc($result)) {
-  $uniforms[] = $row['uniform_name'];
-  $available_sizes = explode(",", $row['available_sizes']);
-  $sizes[$row['uniform_name']] = array_map('trim', $available_sizes);
-  $size_prices = [
-    'XS' => $row['price_xs'] ?? 0,
-    'S' => $row['price_s'] ?? 0,
-    'M' => $row['price_m'] ?? 0,
-    'L' => $row['price_l'] ?? 0,
-    'XL' => $row['price_xl'] ?? 0
-  ];
-  $prices[$row['uniform_name']] = $size_prices;
+  $uniforms[] = $row;
 }
 ?>
 
@@ -95,11 +82,32 @@ while ($row = mysqli_fetch_assoc($result)) {
       background: #d62828;
     }
 
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+
     .price {
       color: #2a9d8f;
       font-weight: bold;
       font-size: 18px;
       margin: 5px 0;
+    }
+
+    .stock-info {
+      color: #666;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+
+    .stock-info.out-of-stock {
+      color: #e63946;
+      font-weight: bold;
+    }
+
+    .stock-info.low-stock {
+      color: #ff9800;
+      font-weight: bold;
     }
 
     .success {
@@ -152,6 +160,13 @@ while ($row = mysqli_fetch_assoc($result)) {
     .qty-btn:disabled {
       opacity: 0.4;
       cursor: not-allowed;
+      border-color: #999;
+      color: #999;
+    }
+
+    .qty-btn:disabled:hover {
+      background: white;
+      color: #999;
     }
 
     .qty-input {
@@ -195,6 +210,11 @@ while ($row = mysqli_fetch_assoc($result)) {
     .btn-group button.active {
       background: #ffc107;
       color: white;
+    }
+
+    .btn-group button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .breakdown {
@@ -241,14 +261,37 @@ while ($row = mysqli_fetch_assoc($result)) {
       background: #e8f5f3;
     }
 
+    .payment-option.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .payment-option.disabled:hover {
+      border-color: #ddd;
+      background: white;
+    }
+
     .payment-option input {
       margin: 0 10px 0 0;
+    }
+
+    .payment-option input:disabled {
+      cursor: not-allowed;
     }
 
     #custom-size,
     #custom-amount-box {
       display: none;
       margin-top: 10px;
+    }
+
+    .out-of-stock-btn {
+      background: #999 !important;
+      cursor: not-allowed !important;
+    }
+
+    .out-of-stock-btn:hover {
+      background: #999 !important;
     }
   </style>
 </head>
@@ -263,22 +306,37 @@ while ($row = mysqli_fetch_assoc($result)) {
     <?php endif; ?>
 
     <?php if (!empty($uniforms)): ?>
-      <form method="POST" action="submit-order.php">
+      <form method="POST" action="submit-order.php" id="order-form">
         <label>Uniform Type</label>
-        <select name="uniform_type" id="uniform-select">
-          <?php foreach ($uniforms as $name): ?>
-            <option value="<?= htmlspecialchars($name) ?>"><?= htmlspecialchars($name) ?></option>
+        <select name="uniform_type" id="uniform-select" onchange="updateSizes()">
+          <?php foreach ($uniforms as $uniform): ?>
+            <option value="<?= htmlspecialchars($uniform['uniform_name']) ?>"
+              data-id="<?= $uniform['id'] ?>"
+              data-sizes="<?= htmlspecialchars($uniform['available_sizes']) ?>"
+              data-price-xs="<?= $uniform['price_xs'] ?>"
+              data-price-s="<?= $uniform['price_s'] ?>"
+              data-price-m="<?= $uniform['price_m'] ?>"
+              data-price-l="<?= $uniform['price_l'] ?>"
+              data-price-xl="<?= $uniform['price_xl'] ?>"
+              data-stock-xs="<?= $uniform['stock_xs'] ?>"
+              data-stock-s="<?= $uniform['stock_s'] ?>"
+              data-stock-m="<?= $uniform['stock_m'] ?>"
+              data-stock-l="<?= $uniform['stock_l'] ?>"
+              data-stock-xl="<?= $uniform['stock_xl'] ?>">
+              <?= htmlspecialchars($uniform['uniform_name']) ?>
+            </option>
           <?php endforeach; ?>
         </select>
 
         <label>Size</label>
-        <select name="size" id="size-select"></select>
+        <select name="size" id="size-select" onchange="updatePrice()"></select>
+        <div class="stock-info" id="stock-info"></div>
 
         <label>Quantity</label>
         <div class="quantity-selector">
-          <button type="button" class="qty-btn" onclick="changeQty(-1)">−</button>
+          <button type="button" class="qty-btn" id="qty-minus" onclick="changeQty(-1)">−</button>
           <input type="number" name="quantity" id="qty-input" class="qty-input" value="1" min="1" max="99" readonly>
-          <button type="button" class="qty-btn" onclick="changeQty(1)">+</button>
+          <button type="button" class="qty-btn" id="qty-plus" onclick="changeQty(1)">+</button>
         </div>
 
         <label>Price per Item</label>
@@ -293,10 +351,10 @@ while ($row = mysqli_fetch_assoc($result)) {
         <div class="downpayment-box">
           <h4>💰 Downpayment</h4>
           <div class="btn-group">
-            <button type="button" class="active" onclick="setDP('full', event)">Full</button>
-            <button type="button" onclick="setDP('50', event)">50%</button>
-            <button type="button" onclick="setDP('30', event)">30%</button>
-            <button type="button" onclick="setDP('custom', event)">Custom</button>
+            <button type="button" class="active" id="dp-full" onclick="setDP('full', event)">Full</button>
+            <button type="button" id="dp-50" onclick="setDP('50', event)">50%</button>
+            <button type="button" id="dp-30" onclick="setDP('30', event)">30%</button>
+            <button type="button" id="dp-custom" onclick="setDP('custom', event)">Custom</button>
           </div>
           <div id="custom-amount-box">
             <input type="number" id="custom-amount" placeholder="Enter amount" min="0" step="0.01" oninput="updateBreakdown()">
@@ -321,20 +379,23 @@ while ($row = mysqli_fetch_assoc($result)) {
         <!-- Payment Method -->
         <div class="payment-box">
           <label>Payment Method</label>
-          <div class="payment-option" onclick="selectPay('cash')">
+          <div class="payment-option" id="pay-cash-option" onclick="selectPay('cash')">
             <input type="radio" name="payment_method" value="cash" id="pay-cash" required>
             <span>💵 Cash</span>
           </div>
-          <div class="payment-option" onclick="selectPay('paypal')">
+          <div class="payment-option" id="pay-paypal-option" onclick="selectPay('paypal')">
             <input type="radio" name="payment_method" value="paypal" id="pay-paypal" required>
             <span>💳 PayPal</span>
           </div>
         </div>
 
+        <!-- CRITICAL: Hidden fields for submit-order.php -->
         <input type="hidden" name="selected_price" id="selected-price" value="0.00">
         <input type="hidden" name="downpayment" id="downpayment-input" value="0.00">
         <input type="hidden" name="school_id" value="<?= $school_id ?>">
-        <button type="submit">Submit Order</button>
+        <input type="hidden" name="uniform_id" id="uniform-id-input" value="0">
+
+        <button type="submit" id="submit-btn">Submit Order</button>
       </form>
     <?php else: ?>
       <p>No uniforms available.</p>
@@ -342,43 +403,65 @@ while ($row = mysqli_fetch_assoc($result)) {
   </div>
 
   <script>
-    const sizeMap = <?= json_encode($sizes) ?>;
-    const priceMap = <?= json_encode($prices) ?>;
     let currentPrice = 0;
+    let currentStock = 0;
     let dpType = 'full';
+    let isOutOfStock = false;
+    let currentUniformId = 0;
 
     function changeQty(change) {
+      if (isOutOfStock) return;
+
       const input = document.getElementById('qty-input');
       let qty = parseInt(input.value) || 1;
       qty += change;
       if (qty < 1) qty = 1;
+      if (qty > currentStock) qty = currentStock;
       if (qty > 99) qty = 99;
       input.value = qty;
       updateBreakdown();
     }
 
     function updateSizes() {
-      const uniform = document.getElementById('uniform-select').value;
-      const sizes = sizeMap[uniform] || [];
-      const prices = priceMap[uniform] || {};
-      const select = document.getElementById('size-select');
+      const uniformSelect = document.getElementById('uniform-select');
+      const selectedOption = uniformSelect.options[uniformSelect.selectedIndex];
 
-      select.innerHTML = '';
+      // IMPORTANT: Get and store the uniform ID
+      currentUniformId = parseInt(selectedOption.getAttribute('data-id')) || 0;
+      document.getElementById('uniform-id-input').value = currentUniformId;
+
+      const sizesStr = selectedOption.getAttribute('data-sizes');
+      const sizes = sizesStr.split(',').map(s => s.trim());
+
+      const sizeSelect = document.getElementById('size-select');
+      sizeSelect.innerHTML = '';
+
       sizes.forEach(size => {
-        const s = size.trim();
-        const p = prices[s] || 0;
+        const priceAttr = 'data-price-' + size.toLowerCase();
+        const stockAttr = 'data-stock-' + size.toLowerCase();
+        const price = parseFloat(selectedOption.getAttribute(priceAttr)) || 0;
+        const stock = parseInt(selectedOption.getAttribute(stockAttr)) || 0;
+
         const opt = document.createElement('option');
-        opt.value = s;
-        opt.textContent = `${s} - ₱${parseFloat(p).toFixed(2)}`;
-        opt.dataset.price = p;
-        select.appendChild(opt);
+        opt.value = size;
+        opt.textContent = size + ' - ₱' + price.toFixed(2);
+        opt.setAttribute('data-price', price);
+        opt.setAttribute('data-stock', stock);
+
+        if (stock === 0) {
+          opt.textContent += ' (Out of Stock)';
+          opt.disabled = true;
+        }
+
+        sizeSelect.appendChild(opt);
       });
 
       const custom = document.createElement('option');
       custom.value = 'custom';
       custom.textContent = 'Customize';
-      custom.dataset.price = '0';
-      select.appendChild(custom);
+      custom.setAttribute('data-price', '0');
+      custom.setAttribute('data-stock', '999');
+      sizeSelect.appendChild(custom);
 
       updatePrice();
     }
@@ -391,19 +474,94 @@ while ($row = mysqli_fetch_assoc($result)) {
       if (size === 'custom') {
         document.getElementById('custom-size').style.display = 'block';
         currentPrice = 0;
+        currentStock = 999;
+        isOutOfStock = false;
       } else {
         document.getElementById('custom-size').style.display = 'none';
-        currentPrice = parseFloat(opt.dataset.price || 0);
+        currentPrice = parseFloat(opt.getAttribute('data-price')) || 0;
+        currentStock = parseInt(opt.getAttribute('data-stock')) || 0;
+        isOutOfStock = currentStock === 0;
       }
 
-      document.getElementById('price-display').textContent = `₱${currentPrice.toFixed(2)}`;
+      // Update stock info
+      const stockInfo = document.getElementById('stock-info');
+      if (size !== 'custom') {
+        if (currentStock === 0) {
+          stockInfo.textContent = '⚠️ Out of Stock';
+          stockInfo.className = 'stock-info out-of-stock';
+        } else if (currentStock < 5) {
+          stockInfo.textContent = '⚠️ Only ' + currentStock + ' items left in stock';
+          stockInfo.className = 'stock-info low-stock';
+        } else {
+          stockInfo.textContent = '✓ ' + currentStock + ' items available';
+          stockInfo.className = 'stock-info';
+        }
+      } else {
+        stockInfo.textContent = '';
+      }
+
+      // Update quantity input max
+      const qtyInput = document.getElementById('qty-input');
+      if (isOutOfStock) {
+        qtyInput.value = 0;
+        qtyInput.max = 0;
+      } else {
+        qtyInput.value = 1;
+        qtyInput.max = Math.min(currentStock, 99);
+      }
+
+      // Disable/enable quantity buttons
+      document.getElementById('qty-minus').disabled = isOutOfStock;
+      document.getElementById('qty-plus').disabled = isOutOfStock;
+
+      // Disable/enable downpayment buttons
+      document.getElementById('dp-full').disabled = isOutOfStock;
+      document.getElementById('dp-50').disabled = isOutOfStock;
+      document.getElementById('dp-30').disabled = isOutOfStock;
+      document.getElementById('dp-custom').disabled = isOutOfStock;
+
+      // Disable/enable payment options
+      const cashOption = document.getElementById('pay-cash-option');
+      const paypalOption = document.getElementById('pay-paypal-option');
+      const cashRadio = document.getElementById('pay-cash');
+      const paypalRadio = document.getElementById('pay-paypal');
+
+      if (isOutOfStock) {
+        cashOption.classList.add('disabled');
+        paypalOption.classList.add('disabled');
+        cashRadio.disabled = true;
+        paypalRadio.disabled = true;
+      } else {
+        cashOption.classList.remove('disabled');
+        paypalOption.classList.remove('disabled');
+        cashRadio.disabled = false;
+        paypalRadio.disabled = false;
+      }
+
+      // Update submit button
+      const submitBtn = document.getElementById('submit-btn');
+      if (isOutOfStock) {
+        submitBtn.textContent = 'Out of Stock';
+        submitBtn.disabled = true;
+        submitBtn.classList.add('out-of-stock-btn');
+      } else {
+        submitBtn.textContent = 'Submit Order';
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('out-of-stock-btn');
+      }
+
+      document.getElementById('price-display').textContent = '₱' + currentPrice.toFixed(2);
       document.getElementById('selected-price').value = currentPrice.toFixed(2);
       updateBreakdown();
     }
 
     function setDP(type, event) {
+      if (isOutOfStock) return;
       event.preventDefault();
-      document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+      const buttons = document.querySelectorAll('.btn-group button');
+      for (let i = 0; i < buttons.length; i++) {
+        buttons[i].classList.remove('active');
+      }
       event.target.classList.add('active');
       dpType = type;
       document.getElementById('custom-amount-box').style.display = type === 'custom' ? 'block' : 'none';
@@ -412,7 +570,15 @@ while ($row = mysqli_fetch_assoc($result)) {
     }
 
     function updateBreakdown() {
-      const qty = parseInt(document.getElementById('qty-input').value) || 1;
+      if (isOutOfStock) {
+        document.getElementById('subtotal').textContent = '₱0.00';
+        document.getElementById('dp-amount').textContent = '₱0.00';
+        document.getElementById('balance').textContent = '₱0.00';
+        document.getElementById('downpayment-input').value = '0.00';
+        return;
+      }
+
+      const qty = parseInt(document.getElementById('qty-input').value) || 0;
       const subtotal = currentPrice * qty;
 
       let dp = 0;
@@ -428,22 +594,36 @@ while ($row = mysqli_fetch_assoc($result)) {
       }
 
       const balance = subtotal - dp;
-      document.getElementById('subtotal').textContent = `₱${subtotal.toFixed(2)}`;
-      document.getElementById('dp-amount').textContent = `₱${dp.toFixed(2)}`;
-      document.getElementById('balance').textContent = `₱${balance.toFixed(2)}`;
+      document.getElementById('subtotal').textContent = '₱' + subtotal.toFixed(2);
+      document.getElementById('dp-amount').textContent = '₱' + dp.toFixed(2);
+      document.getElementById('balance').textContent = '₱' + balance.toFixed(2);
       document.getElementById('downpayment-input').value = dp.toFixed(2);
     }
 
     function selectPay(method) {
-      document.querySelectorAll('.payment-option').forEach(o => o.classList.remove('selected'));
-      const radio = document.getElementById(`pay-${method}`);
+      if (isOutOfStock) return;
+      const options = document.querySelectorAll('.payment-option');
+      for (let i = 0; i < options.length; i++) {
+        options[i].classList.remove('selected');
+      }
+      const radio = document.getElementById('pay-' + method);
       radio.checked = true;
       radio.closest('.payment-option').classList.add('selected');
     }
 
-    document.getElementById('uniform-select').addEventListener('change', updateSizes);
-    document.getElementById('size-select').addEventListener('change', updatePrice);
+    // Prevent form submission when out of stock
+    document.getElementById('order-form').addEventListener('submit', function(e) {
+      if (isOutOfStock) {
+        e.preventDefault();
+        alert('This item is currently out of stock. Please select a different size or uniform.');
+        return false;
+      }
 
+      // Debug log to verify uniform_id is being sent
+      console.log('Submitting order with uniform_id:', document.getElementById('uniform-id-input').value);
+    });
+
+    // Initialize on page load
     updateSizes();
   </script>
 </body>
