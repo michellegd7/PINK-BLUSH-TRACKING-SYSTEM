@@ -148,6 +148,45 @@ if ($result && $result->num_rows > 0) {
             font-size: 1.1rem;
         }
 
+        /* Alert Messages */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert-success {
+            background: #c6f6d5;
+            color: #22543d;
+            border-left: 4px solid #38a169;
+        }
+
+        .alert-error {
+            background: #fed7d7;
+            color: #742a2a;
+            border-left: 4px solid #e53e3e;
+        }
+
+        .alert-icon {
+            font-size: 1.25rem;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
         /* Order Table */
         .table-container {
             background: white;
@@ -174,6 +213,8 @@ if ($result && $result->num_rows > 0) {
             cursor: pointer;
             font-size: 0.9rem;
             transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
         }
 
         .btn:hover {
@@ -195,15 +236,19 @@ if ($result && $result->num_rows > 0) {
             font-size: 0.85rem;
         }
 
-        .btn-save {
-            background: #48bb78;
-            border-color: #48bb78;
+        .btn-danger {
+            background: #f56565;
+            border-color: #f56565;
             color: white;
-            margin-left: 0.5rem;
         }
 
-        .btn-save:hover {
-            background: #38a169;
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
         }
 
         table {
@@ -296,6 +341,10 @@ if ($result && $result->num_rows > 0) {
                 padding: 0.75rem 0.5rem;
                 font-size: 0.9rem;
             }
+
+            .action-buttons {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -313,7 +362,7 @@ if ($result && $result->num_rows > 0) {
                 <li class="nav-item"><a href="admin_orders.php">Orders</a></li>
                 <li class="nav-item"><a href="admin_customer.php">Customers</a></li>
                 <li class="nav-item active">Products</li>
-                <li class="nav-item"><a href="admin_track_order.php">Tracking</a></li>
+                <li class="nav-item"><a href="admin_stocks.php">Stocks</a></li>
             </ul>
             <div class="user-info">
                 <span><?php echo htmlspecialchars($admin_name); ?></span>
@@ -329,10 +378,27 @@ if ($result && $result->num_rows > 0) {
             <p class="page-subtitle">Manage school uniform options and pricing</p>
         </div>
 
+        <!-- Alert Messages -->
+        <?php if (isset($_SESSION['success_message'])): ?>
+            <div class="alert alert-success">
+                <span class="alert-icon">✓</span>
+                <span><?php echo htmlspecialchars($_SESSION['success_message']); ?></span>
+            </div>
+            <?php unset($_SESSION['success_message']); ?>
+        <?php endif; ?>
+
+        <?php if (isset($_SESSION['error_message'])): ?>
+            <div class="alert alert-error">
+                <span class="alert-icon">✕</span>
+                <span><?php echo htmlspecialchars($_SESSION['error_message']); ?></span>
+            </div>
+            <?php unset($_SESSION['error_message']); ?>
+        <?php endif; ?>
+
         <div class="table-container">
             <div class="table-header">
                 <h3 class="card-title">All Uniforms</h3>
-                <button class="btn btn-primary"><a href="admin_add_products.php">+ Add Product</a></button>
+                <a href="admin_add_products.php" class="btn btn-primary">+ Add Product</a>
             </div>
             <table>
                 <thead>
@@ -348,47 +414,58 @@ if ($result && $result->num_rows > 0) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($products as $product): ?>
+                    <?php if (empty($products)): ?>
                         <tr>
-                            <td>#<?= str_pad($product['id'], 3, '0', STR_PAD_LEFT) ?></td>
-                            <td><?= htmlspecialchars($product['school_id']) ?></td>
-                            <td><?= htmlspecialchars($product['uniform_type']) ?></td>
-                            <td class="garment-type"><?= htmlspecialchars($product['uniform_name']) ?></td>
-                            <td><?= htmlspecialchars($product['available_sizes']) ?></td>
-                            <td>
-                                <span class="status <?= $product['customizable'] ? 'status-fitting' : 'status-cutting' ?>">
-                                    <?= $product['customizable'] ? 'Yes' : 'No' ?>
-                                </span>
-                            </td>
-                            <td>
-                                <div class="price-display">
-                                    <div class="size-price-row">
-                                        <span class="size-label">XS:</span>
-                                        <span class="price-value">₱<?= number_format($product['price_xs'], 2) ?></span>
-                                    </div>
-                                    <div class="size-price-row">
-                                        <span class="size-label">S:</span>
-                                        <span class="price-value">₱<?= number_format($product['price_s'], 2) ?></span>
-                                    </div>
-                                    <div class="size-price-row">
-                                        <span class="size-label">M:</span>
-                                        <span class="price-value">₱<?= number_format($product['price_m'], 2) ?></span>
-                                    </div>
-                                    <div class="size-price-row">
-                                        <span class="size-label">L:</span>
-                                        <span class="price-value">₱<?= number_format($product['price_l'], 2) ?></span>
-                                    </div>
-                                    <div class="size-price-row">
-                                        <span class="size-label">XL:</span>
-                                        <span class="price-value">₱<?= number_format($product['price_xl'], 2) ?></span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td style="vertical-align: middle;">
-                                <a href="admin_product_edit.php?id=<?= $product['id'] ?>" class="btn btn-sm btn-primary">Edit</a>
+                            <td colspan="8" style="text-align: center; padding: 2rem; color: #718096;">
+                                No products found. Click "Add Product" to create one.
                             </td>
                         </tr>
-                    <?php endforeach; ?>
+                    <?php else: ?>
+                        <?php foreach ($products as $product): ?>
+                            <tr>
+                                <td>#<?= str_pad($product['id'], 3, '0', STR_PAD_LEFT) ?></td>
+                                <td><?= htmlspecialchars($product['school_id']) ?></td>
+                                <td><?= htmlspecialchars($product['uniform_type']) ?></td>
+                                <td class="garment-type"><?= htmlspecialchars($product['uniform_name']) ?></td>
+                                <td><?= htmlspecialchars($product['available_sizes']) ?></td>
+                                <td>
+                                    <span class="status <?= $product['customizable'] ? 'status-fitting' : 'status-cutting' ?>">
+                                        <?= $product['customizable'] ? 'Yes' : 'No' ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="price-display">
+                                        <div class="size-price-row">
+                                            <span class="size-label">XS:</span>
+                                            <span class="price-value">₱<?= number_format($product['price_xs'], 2) ?></span>
+                                        </div>
+                                        <div class="size-price-row">
+                                            <span class="size-label">S:</span>
+                                            <span class="price-value">₱<?= number_format($product['price_s'], 2) ?></span>
+                                        </div>
+                                        <div class="size-price-row">
+                                            <span class="size-label">M:</span>
+                                            <span class="price-value">₱<?= number_format($product['price_m'], 2) ?></span>
+                                        </div>
+                                        <div class="size-price-row">
+                                            <span class="size-label">L:</span>
+                                            <span class="price-value">₱<?= number_format($product['price_l'], 2) ?></span>
+                                        </div>
+                                        <div class="size-price-row">
+                                            <span class="size-label">XL:</span>
+                                            <span class="price-value">₱<?= number_format($product['price_xl'], 2) ?></span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="vertical-align: middle;">
+                                    <div class="action-buttons">
+                                        <a href="admin_product_edit.php?id=<?= $product['id'] ?>" class="btn btn-sm btn-primary">Edit</a>
+                                        <a href="admin_product_delete.php?id=<?= $product['id'] ?>" class="btn btn-sm btn-danger">Delete</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
