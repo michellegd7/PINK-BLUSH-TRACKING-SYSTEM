@@ -27,7 +27,7 @@
             padding: 40px;
             border-radius: 12px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            max-width: 550px;
+            max-width: 450px;
             width: 100%;
         }
 
@@ -49,7 +49,8 @@
             margin-bottom: 20px;
         }
 
-        .role-select label {
+        .role-select label,
+        label {
             display: block;
             margin-bottom: 8px;
             color: #5a6c7d;
@@ -57,7 +58,8 @@
             font-size: 14px;
         }
 
-        .role-select select {
+        .role-select select,
+        select {
             width: 100%;
             padding: 12px;
             border: 2px solid #e9ecef;
@@ -67,32 +69,19 @@
             transition: border-color 0.3s;
         }
 
-        .role-select select:focus {
+        .role-select select:focus,
+        select:focus {
             outline: none;
             border-color: #667eea;
         }
 
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .form-group label {
-            margin-bottom: 8px;
-            color: #5a6c7d;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .form-group input {
+        input[type="text"],
+        input[type="password"],
+        input[type="email"],
+        input[type="tel"] {
+            width: 100%;
             padding: 12px;
+            margin-bottom: 20px;
             border: 2px solid #e9ecef;
             border-radius: 6px;
             font-size: 14px;
@@ -100,9 +89,17 @@
             transition: border-color 0.3s;
         }
 
-        .form-group input:focus {
+        input:focus {
             outline: none;
             border-color: #667eea;
+        }
+
+        .staff-fields {
+            display: none;
+        }
+
+        .staff-fields.active {
+            display: block;
         }
 
         .submit-btn {
@@ -116,7 +113,6 @@
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.2s;
-            margin-top: 10px;
         }
 
         .submit-btn:hover {
@@ -152,10 +148,6 @@
             .container {
                 padding: 30px 20px;
             }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
@@ -163,40 +155,42 @@
 <body>
     <div class="container">
         <h2>Create Account</h2>
-        <p class="subtitle">Register your new account</p>
+        <p class="subtitle">Register your account</p>
 
         <form onsubmit="handleSubmit(event)">
             <div class="role-select">
                 <label>Select Role</label>
-                <select id="registerRole">
+                <select id="registerRole" onchange="toggleStaffFields()">
                     <option value="admin">Admin</option>
                     <option value="staff">Staff</option>
                 </select>
             </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Full Name</label>
-                    <input type="text" id="fullName" placeholder="Enter full name" required>
-                </div>
+            <label>Full Name</label>
+            <input type="text" id="fullName" placeholder="Enter full name" required>
 
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" id="regUsername" placeholder="Enter username" required>
-                </div>
+            <label>Username</label>
+            <input type="text" id="username" placeholder="Enter username" required>
+
+            <label>Password</label>
+            <input type="password" id="password" placeholder="Enter password" required minlength="6">
+
+            <label>Confirm Password</label>
+            <input type="password" id="confirmPassword" placeholder="Confirm password" required minlength="6">
+
+            <div id="staffFields" class="staff-fields">
+                <label>Email</label>
+                <input type="email" id="email" placeholder="Enter email address">
+
+                <label>Staff Role</label>
+                <select id="staffRole">
+                    <option value="Tailor">Tailor</option>
+                    <option value="masterCutter">Master Cutter</option>
+                </select>
             </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="regPassword" placeholder="Create password" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Confirm Password</label>
-                    <input type="password" id="regConfirm" placeholder="Confirm password" required>
-                </div>
-            </div>
+            <label>Contact Number</label>
+            <input type="tel" id="contactNumber" placeholder="Enter contact number" required>
 
             <button type="submit" class="submit-btn">Register</button>
 
@@ -207,22 +201,32 @@
     </div>
 
     <script>
+        function toggleStaffFields() {
+            const role = document.getElementById('registerRole').value;
+            const staffFields = document.getElementById('staffFields');
+            const emailField = document.getElementById('email');
+
+            if (role === 'staff') {
+                staffFields.classList.add('active');
+                emailField.required = true;
+            } else {
+                staffFields.classList.remove('active');
+                emailField.required = false;
+            }
+        }
+
         function handleSubmit(e) {
             e.preventDefault();
 
             const role = document.getElementById('registerRole').value;
             const fullName = document.getElementById('fullName').value;
-            const username = document.getElementById('regUsername').value;
-            const password = document.getElementById('regPassword').value;
-            const confirm = document.getElementById('regConfirm').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const contactNumber = document.getElementById('contactNumber').value;
 
-            if (password !== confirm) {
+            if (password !== confirmPassword) {
                 alert('Passwords do not match!');
-                return;
-            }
-
-            if (password.length < 6) {
-                alert('Password must be at least 6 characters long!');
                 return;
             }
 
@@ -232,7 +236,14 @@
             data.append('full_name', fullName);
             data.append('username', username);
             data.append('password', password);
-            data.append('confirm_password', confirm);
+            data.append('contact_number', contactNumber);
+
+            if (role === 'staff') {
+                const email = document.getElementById('email').value;
+                const staffRole = document.getElementById('staffRole').value;
+                data.append('email', email);
+                data.append('staff_role', staffRole);
+            }
 
             fetch('auth.php', {
                     method: 'POST',
@@ -240,9 +251,9 @@
                 })
                 .then(res => res.text())
                 .then(response => {
-                    if (response === 'registered') {
+                    if (response === 'success') {
                         alert('Registration successful! Please login.');
-                        window.location.href = 'admin_login.php';
+                        window.location.href = role === 'admin' ? 'admin_login.php' : 'staff_login.php';
                     } else if (response === 'username_exists') {
                         alert('Username already exists. Please choose another.');
                     } else {
