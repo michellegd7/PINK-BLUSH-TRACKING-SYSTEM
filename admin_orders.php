@@ -12,17 +12,34 @@ $admin_initial = strtoupper(substr($admin_name, 0, 1));
 
 include 'database.php';
 
-// Fetch all orders with customer info
-$query = "SELECT o.*, c.first_name, c.last_name, c.email 
-          FROM orders o 
-          LEFT JOIN customer c ON o.customer_id = c.customer_id 
-          ORDER BY o.order_date DESC";
-
+// Fetch all orders with customer info, order items, and payment details
+$query = "SELECT 
+    o.order_id,
+    o.customer_id,
+    o.order_date,
+    o.due_date,
+    o.status,
+    o.school_id,
+    c.first_name,
+    c.last_name,
+    c.email,
+    c.contact_number,
+    GROUP_CONCAT(DISTINCT oi.item_type SEPARATOR ', ') as order_items,
+    SUM(oi.quantity) as total_quantity,
+    GROUP_CONCAT(DISTINCT oi.measurement SEPARATOR ', ') as sizes,
+    p.payment_status,
+    p.total_amount,
+    p.downpayment,
+    p.balance
+FROM orders o 
+LEFT JOIN customer c ON o.customer_id = c.customer_id 
+LEFT JOIN order_item oi ON o.order_id = oi.order_id
+LEFT JOIN payment p ON o.order_id = p.order_id
+GROUP BY o.order_id
+ORDER BY o.order_date DESC";
 
 $result = mysqli_query($conn, $query);
 $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
-
-
 ?>
 
 <!DOCTYPE html>
@@ -30,6 +47,7 @@ $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Orders</title>
     <style>
         * {
@@ -60,7 +78,7 @@ $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -88,19 +106,12 @@ $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
 
         .nav-item a {
             text-decoration: none;
-            color: inherit;
+            color: white;
             display: block;
         }
 
-        .nav-item.active a {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-        }
-
-
-        .nav-item:hover,
-        .nav-item.active {
+        .nav-item.active,
+        .nav-item:hover {
             background: rgba(255, 255, 255, 0.2);
         }
 
@@ -121,22 +132,9 @@ $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
             font-weight: bold;
         }
 
-        .btn-danger {
-            background-color: #e63946;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .btn-danger:hover {
-            background-color: #d62828;
-        }
-
         /* Main Content */
         .main-content {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 2rem auto;
             padding: 0 2rem;
         }
@@ -158,151 +156,7 @@ $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
             font-size: 1.1rem;
         }
 
-        /* Stats Cards */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            text-align: center;
-            transition: transform 0.2s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-        }
-
-        .stat-icon {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2d3748;
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-label {
-            color: #718096;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
-        /* Dashboard Grid */
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .card {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-        }
-
-        .card-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid #e2e8f0;
-            background: #f7fafc;
-        }
-
-        .card-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #2d3748;
-        }
-
-        .card-content {
-            padding: 1.5rem;
-        }
-
-        /* Order Tracking Timeline */
-        .timeline {
-            position: relative;
-        }
-
-        .timeline-item {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            position: relative;
-        }
-
-        .timeline-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .timeline-item::before {
-            content: '';
-            position: absolute;
-            left: 20px;
-            top: 40px;
-            bottom: -15px;
-            width: 2px;
-            background: #e2e8f0;
-        }
-
-        .timeline-item:last-child::before {
-            display: none;
-        }
-
-        .timeline-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-            z-index: 1;
-        }
-
-        .timeline-icon.completed {
-            background: #c6f6d5;
-            color: #2f855a;
-        }
-
-        .timeline-icon.current {
-            background: #bee3f8;
-            color: #2b6cb0;
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
-        }
-
-        .timeline-icon.pending {
-            background: #f7fafc;
-            color: #a0aec0;
-        }
-
-        .timeline-content h4 {
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .timeline-content p {
-            color: #718096;
-            font-size: 0.9rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .timeline-date {
-            color: #a0aec0;
-            font-size: 0.8rem;
-        }
-
-        /* Order Table */
+        /* Table Container */
         .table-container {
             background: white;
             border-radius: 10px;
@@ -314,205 +168,248 @@ $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
             padding: 1.5rem;
             background: #f7fafc;
             border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
 
-        .btn {
-            padding: 0.5rem 1rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            background: white;
-            color: #4a5568;
-            cursor: pointer;
+        .table-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.25rem;
+        }
+
+        .table-subtitle {
+            color: #718096;
             font-size: 0.9rem;
-            transition: all 0.2s;
         }
 
-        .btn:hover {
-            background: #f7fafc;
-        }
-
-        .btn-primary {
-            background: #4299e1;
-            border-color: #4299e1;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #3182ce;
-        }
-
-        table {
+        /* Table Styles */
+        .orders-table {
             width: 100%;
             border-collapse: collapse;
+            font-size: 0.9rem;
         }
 
-        th,
-        td {
-            text-align: left;
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
-        th {
+        .orders-table thead {
             background: #f7fafc;
+        }
+
+        .orders-table th {
+            padding: 12px;
+            text-align: left;
             font-weight: 600;
             color: #4a5568;
+            border-bottom: 2px solid #e2e8f0;
+            white-space: nowrap;
         }
 
-        tr:hover {
+        .orders-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+
+        .orders-table tbody tr:hover {
             background: #f7fafc;
         }
 
-        .status {
-            padding: 0.25rem 0.75rem;
-            border-radius: 15px;
-            font-size: 0.8rem;
+        .orders-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Customer Info */
+        .customer-name {
+            font-weight: 600;
+            color: #2d3748;
+            display: block;
+        }
+
+        .customer-contact {
+            font-size: 0.85rem;
+            color: #718096;
+            display: block;
+            margin-top: 2px;
+        }
+
+        /* Order Items */
+        .order-items {
             font-weight: 500;
+            color: #2d3748;
         }
 
-        .status-measuring {
-            background: #fed7d7;
-            color: #c53030;
+        /* Status Badge */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: capitalize;
+            white-space: nowrap;
         }
 
-        .status-cutting {
+        .status-pending {
             background: #feebc8;
-            color: #dd6b20;
+            color: #c05621;
         }
 
-        .status-sewing {
+        .status-payment_confirmation,
+        .status-order_confirmation {
             background: #bee3f8;
-            color: #2b6cb0;
+            color: #2c5282;
         }
 
-        .status-fitting {
-            background: #e6fffa;
-            color: #319795;
+        .status-measurement,
+        .status-material_preparation,
+        .status-cutting,
+        .status-sewing {
+            background: #e9d8fd;
+            color: #553c9a;
+        }
+
+        .status-finishing,
+        .status-quality_checking {
+            background: #fef5e7;
+            color: #d68910;
+        }
+
+        .status-ready_for_pickup,
+        .status-final_payment {
+            background: #d4edda;
+            color: #2f855a;
         }
 
         .status-completed {
             background: #c6f6d5;
+            color: #22543d;
+        }
+
+        /* Payment Status */
+        .payment-unpaid {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .payment-partial {
+            background: #feebc8;
+            color: #c05621;
+        }
+
+        .payment-paid {
+            background: #c6f6d5;
             color: #2f855a;
         }
 
-        .status-delivered {
-            background: #e9d8fd;
-            color: #805ad5;
-        }
-
-        .customer-info {
-            font-weight: 500;
-        }
-
-        .customer-info small {
-            display: block;
-            color: #718096;
-            font-weight: 400;
-        }
-
-        .garment-type {
-            font-weight: 500;
-            color: #4a5568;
-        }
-
-        .price {
+        /* Amount */
+        .amount {
             font-weight: 600;
             color: #2d3748;
         }
 
+        /* Due Date */
         .due-date {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+
+        .due-date.urgent {
             color: #e53e3e;
+            font-weight: 600;
+        }
+
+        .due-date.soon {
+            color: #dd6b20;
             font-weight: 500;
         }
 
-        .due-date.safe {
-            color: #38a169;
-        }
-
-        .btn-primary {
-            background-color: #4a90e2;
-            color: white;
+        /* Action Buttons */
+        .btn {
             padding: 6px 12px;
             border: none;
             border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
             text-decoration: none;
-            font-size: 14px;
+            display: inline-block;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #4299e1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #3182ce;
         }
 
         .btn-danger {
             background-color: #e63946;
             color: white;
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-
-        .btn-primary:hover {
-            background-color: #357ab8;
+            margin-left: 5px;
         }
 
         .btn-danger:hover {
             background-color: #d62828;
         }
 
-
-        /* Recent Orders */
-        .recent-order {
+        .action-buttons {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid #f1f5f9;
+            gap: 5px;
+            white-space: nowrap;
         }
 
-        .recent-order:last-child {
-            border-bottom: none;
+        .action-buttons form {
+            display: inline;
         }
 
-        .order-info h4 {
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .order-info p {
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
             color: #718096;
-            font-size: 0.9rem;
         }
 
-        .order-status {
-            text-align: right;
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
         }
 
         /* Responsive */
+        @media (max-width: 1200px) {
+            .orders-table {
+                font-size: 0.85rem;
+            }
+
+            .orders-table th,
+            .orders-table td {
+                padding: 10px 8px;
+            }
+        }
+
         @media (max-width: 768px) {
             .nav-menu {
                 display: none;
-            }
-
-            .dashboard-grid {
-                grid-template-columns: 1fr;
             }
 
             .main-content {
                 padding: 0 1rem;
             }
 
-            th,
-            td {
-                padding: 0.75rem 1rem;
-                font-size: 0.9rem;
+            .table-container {
+                overflow-x: auto;
+            }
+
+            .orders-table {
+                min-width: 1200px;
             }
         }
     </style>
 </head>
 
 <body>
-
     <!-- Top Navigation -->
     <nav class="top-nav">
         <div class="nav-container">
@@ -522,10 +419,10 @@ $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
             </div>
             <ul class="nav-menu">
                 <li class="nav-item"><a href="admin_dashboard.php">Dashboard</a></li>
-                <li class="nav-item active">Orders</li>
+                <li class="nav-item active"><a href="admin_orders.php">Orders</a></li>
                 <li class="nav-item"><a href="admin_customer.php">Customers</a></li>
                 <li class="nav-item"><a href="admin_products.php">Products</a></li>
-                <li class="nav-item"><a href="admin_track_order.php">Tracking</a></li>
+                <li class="nav-item"><a href="admin_stocks.php">Stocks</a></li>
             </ul>
             <div class="user-info">
                 <span><?php echo htmlspecialchars($admin_name); ?></span>
@@ -542,55 +439,118 @@ $orders = mysqli_fetch_all($result, MYSQLI_ASSOC);
         </div>
 
         <?php if (!empty($orders)): ?>
-            <div class="form-container">
-                <div class="form-header">
-                    <h3 class="form-title">Orders List</h3>
-                    <p class="form-subtitle">Click edit to update order details</p>
+            <div class="table-container">
+                <div class="table-header">
+                    <h3 class="table-title">Orders List</h3>
+                    <p class="table-subtitle">Click edit to update order details</p>
                 </div>
 
-                <table style="width:100%; border-collapse:collapse;">
+                <table class="orders-table">
                     <thead>
-                        <tr style="background:#edf2f7;">
-                            <th style="padding:12px; text-align:left;">Order ID</th>
-                            <th style="padding:12px; text-align:left;">Customer</th>
-                            <th style="padding:12px; text-align:left;">Email</th>
-                            <th style="padding:12px; text-align:left;">Order Date</th>
-                            <th style="padding:12px; text-align:left;">Status</th>
-                            <th style="padding:12px; text-align:left;">School ID</th>
-                            <th style="padding:12px; text-align:left;">Actions</th>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Customer</th>
+                            <th>Order Items</th>
+                            <th>Quantity</th>
+                            <th>Size</th>
+                            <th>Order Date</th>
+                            <th>Status</th>
+                            <th>Payment</th>
+                            <th>Amount</th>
+                            <th>Due Date</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($orders as $order): ?>
-                            <tr style="border-bottom:1px solid #e2e8f0;">
-                                <td style="padding:12px;">#<?= str_pad($order['order_id'], 4, '0', STR_PAD_LEFT) ?></td>
-                                <td style="padding:12px;"><?= htmlspecialchars($order['first_name'] . ' ' . $order['last_name']) ?></td>
-                                <td style="padding:12px;"><?= htmlspecialchars($order['email'] ?? '—') ?></td>
-                                <td style="padding:12px;"><?= htmlspecialchars($order['order_date']) ?></td>
-                                <td style="padding:12px;">
-                                    <span class="status-badge status-<?= strtolower($order['status']) ?>">
+                        <?php foreach ($orders as $order):
+                            // Calculate days until due date
+                            $dueDate = $order['due_date'];
+                            $dueDateClass = '';
+                            $dueDateText = 'Not set';
+
+                            if ($dueDate && $dueDate != '0000-00-00') {
+                                $today = new DateTime();
+                                $due = new DateTime($dueDate);
+                                $diff = $today->diff($due);
+                                $daysUntil = (int)$diff->format('%R%a');
+
+                                if ($daysUntil < 0) {
+                                    $dueDateClass = 'urgent';
+                                    $dueDateText = 'Overdue';
+                                } elseif ($daysUntil <= 3) {
+                                    $dueDateClass = 'soon';
+                                    $dueDateText = date('M j, Y', strtotime($dueDate));
+                                } else {
+                                    $dueDateText = date('M j, Y', strtotime($dueDate));
+                                }
+                            }
+                        ?>
+                            <tr>
+                                <td><strong>#<?= str_pad($order['order_id'], 4, '0', STR_PAD_LEFT) ?></strong></td>
+
+                                <td>
+                                    <span class="customer-name"><?= htmlspecialchars($order['first_name'] . ' ' . $order['last_name']) ?></span>
+                                    <span class="customer-contact"><?= htmlspecialchars($order['contact_number'] ?? '') ?></span>
+                                </td>
+
+                                <td>
+                                    <span class="order-items"><?= htmlspecialchars($order['order_items'] ?? '—') ?></span>
+                                </td>
+
+                                <td><?= htmlspecialchars($order['total_quantity'] ?? 0) ?></td>
+
+                                <td><?= htmlspecialchars($order['sizes'] ?? '—') ?></td>
+
+                                <td><?= date('M j, Y', strtotime($order['order_date'])) ?></td>
+
+                                <td>
+                                    <span class="status-badge status-<?= strtolower(str_replace(' ', '_', $order['status'])) ?>">
                                         <?= htmlspecialchars($order['status']) ?>
                                     </span>
                                 </td>
-                                <td style="padding:12px;"><?= htmlspecialchars($order['order_id']) ?></td> <!-- School ID column showing order_id -->
-                                <td style="padding:12px;">
-                                    <a href="admin_edit_order.php?id=<?= $order['order_id'] ?>" class="btn btn-primary">Edit</a>
-                                    <form action="admin_delete_order.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this order?');">
-                                        <input type="hidden" name="order_id" value="<?= $order['order_id'] ?>">
-                                        <button type="submit" class="btn btn-danger">Delete</button>
-                                    </form>
+
+                                <td>
+                                    <span class="status-badge payment-<?= strtolower($order['payment_status'] ?? 'unpaid') ?>">
+                                        <?= htmlspecialchars($order['payment_status'] ?? 'Unpaid') ?>
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <span class="amount">₱<?= number_format($order['total_amount'] ?? 0, 2) ?></span>
+                                </td>
+
+                                <td>
+                                    <span class="due-date <?= $dueDateClass ?>">
+                                        <?= $dueDateText ?>
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <div class="action-buttons">
+                                        <a href="admin_edit_order.php?id=<?= $order['order_id'] ?>" class="btn btn-primary">Edit</a>
+                                        <form action="admin_delete_order.php" method="POST" onsubmit="return confirm('Are you sure you want to delete this order?');">
+                                            <input type="hidden" name="order_id" value="<?= $order['order_id'] ?>">
+                                            <button type="submit" class="btn btn-danger">Delete</button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
-
                 </table>
             </div>
         <?php else: ?>
-            <div class="alert alert-error">No orders found.</div>
+            <div class="table-container">
+                <div class="empty-state">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                    </svg>
+                    <h3>No orders found</h3>
+                    <p>There are no orders in the system yet.</p>
+                </div>
+            </div>
         <?php endif; ?>
     </div>
-
 </body>
 
 </html>
